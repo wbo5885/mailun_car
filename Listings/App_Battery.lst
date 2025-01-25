@@ -1,0 +1,59 @@
+C51 COMPILER V9.60.7.0   APP_BATTERY                                                       08/29/2024 12:06:30 PAGE 1   
+
+
+C51 COMPILER V9.60.7.0, COMPILATION OF MODULE APP_BATTERY
+OBJECT MODULE PLACED IN .\Objects\App_Battery.obj
+COMPILER INVOKED BY: D:\Keil_v5\C51\BIN\C51.EXE App\App_Battery.c LARGE OPTIMIZE(8,SPEED) BROWSE INCDIR(.\Lib;.\User;.\D
+                    -river;.\App) DEBUG OBJECTEXTEND PRINT(.\Listings\App_Battery.lst) TABS(2) OBJECT(.\Objects\App_Battery.obj)
+
+line level    source
+
+   1          #include "App.h"
+   2          #include "Battery.h"
+   3          #include "Buzzer.h"
+   4          
+   5          #define LOW_POWER 10.5
+   6          
+   7          float voltage;
+   8          // 判断是否是低电量
+   9          u8 isLowPower(){ // 小驼峰写法
+  10   1          return voltage < LOW_POWER;
+  11   1      }
+  12          
+  13          // 2000ms获取一次电量
+  14          
+  15          void task_battery() _task_ TASK_BATTERY {
+  16   1      
+  17   1        // 初始化电池模块
+  18   1        Battery_init();
+  19   1        
+  20   1        // 循环获取并判断电量
+  21   1        while(1){
+  22   2          voltage = Battery_get_voltage();
+  23   2          printf("vol: %.2f V\n", voltage);
+  24   2          
+  25   2          if(isLowPower()){
+  26   3            printf("Battery voltage is too low, please charge it: %.2f V\n", voltage);
+  27   3            Buzzer_alarm3();
+  28   3          }
+  29   2        
+  30   2          // 等待函数 2000ms
+  31   2          os_wait2(K_TMO, 200);
+  32   2          os_wait2(K_TMO, 200);
+  33   2        }
+  34   1        
+  35   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    127    ----
+   CONSTANT SIZE    =     67    ----
+   XDATA SIZE       =      4    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

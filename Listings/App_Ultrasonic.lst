@@ -1,0 +1,58 @@
+C51 COMPILER V9.60.7.0   APP_ULTRASONIC                                                    08/29/2024 12:06:30 PAGE 1   
+
+
+C51 COMPILER V9.60.7.0, COMPILATION OF MODULE APP_ULTRASONIC
+OBJECT MODULE PLACED IN .\Objects\App_Ultrasonic.obj
+COMPILER INVOKED BY: D:\Keil_v5\C51\BIN\C51.EXE App\App_Ultrasonic.c LARGE OPTIMIZE(8,SPEED) BROWSE INCDIR(.\Lib;.\User;
+                    -.\Driver;.\App) DEBUG OBJECTEXTEND PRINT(.\Listings\App_Ultrasonic.lst) TABS(2) OBJECT(.\Objects\App_Ultrasonic.obj)
+
+line level    source
+
+   1          #include "App.h"
+   2          #include "Ultrasonic.h"
+   3          #include "Buzzer.h"
+   4          
+   5          u8 is_ultrasonic_enable = 0; // 0关闭，1开启
+   6          float global_distance_cm = -1;
+   7          
+   8          void task_ultrasonic() _task_ TASK_ULTRASONIC {
+   9   1        float distance = 0;
+  10   1      
+  11   1        Ultrasonic_init();
+  12   1      
+  13   1        while(1){
+  14   2      
+  15   2          if (!is_ultrasonic_enable) {
+  16   3            os_wait2(K_TMO, 40); // 200ms
+  17   3            continue;
+  18   3          }
+  19   2      
+  20   2          if(Ultrasonic_get_distance(&distance) == 0){
+  21   3            printf("当前距离: %.2f cm\n", distance);
+  22   3            global_distance_cm = distance;
+  23   3      
+  24   3            // 如果距离小于20cm，蜂鸣器响
+  25   3            Buzzer_alarm();
+  26   3          }else {
+  27   3            printf("获取距离失败\n");
+  28   3          }
+  29   2      
+  30   2          // 200ms
+  31   2          os_wait2(K_TMO, 40); // 200ms = 40 * 5ms
+  32   2        }
+  33   1      
+  34   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    110    ----
+   CONSTANT SIZE    =     33    ----
+   XDATA SIZE       =      5       4
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

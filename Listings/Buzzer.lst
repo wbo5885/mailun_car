@@ -1,0 +1,167 @@
+C51 COMPILER V9.60.7.0   BUZZER                                                            08/29/2024 12:06:30 PAGE 1   
+
+
+C51 COMPILER V9.60.7.0, COMPILATION OF MODULE BUZZER
+OBJECT MODULE PLACED IN .\Objects\Buzzer.obj
+COMPILER INVOKED BY: D:\Keil_v5\C51\BIN\C51.EXE Driver\Buzzer.c LARGE OPTIMIZE(8,SPEED) BROWSE INCDIR(.\Lib;.\User;.\Dri
+                    -ver;.\App) DEBUG OBJECTEXTEND PRINT(.\Listings\Buzzer.lst) TABS(2) OBJECT(.\Objects\Buzzer.obj)
+
+line level    source
+
+   1          #include "Buzzer.h"
+   2          #include "GPIO.h"
+   3          #include "STC8H_PWM.h"
+   4          #include "NVIC.h"
+   5          #include "Switch.h"
+   6          
+   7          u16 code FREQS[] = {
+   8            523 * 1, 587 * 1, 659 * 1, 698 * 1, 784 * 1, 880 * 1, 988 * 1, 
+   9            523 * 2, 587 * 2, 659 * 2, 698 * 2, 784 * 2, 880 * 2, 988 * 2, 
+  10            523 * 4, 587 * 4, 659 * 4, 698 * 4, 784 * 4, 880 * 4, 988 * 4, 
+  11            523 * 8, 587 * 8, 659 * 8, 698 * 8, 784 * 8, 880 * 8, 988 * 8, 
+  12          };
+  13          //           C`    D`     E`   F`    G`    A`    B`    C``
+  14          //u16 hz[] = {1047, 1175, 1319, 1397, 1568, 1760, 1976, 2093};
+  15          
+  16          //            C    D    E    F    G    A    B    C`
+  17          //u16 hz[] = {523, 587, 659, 698, 784, 880, 988, 1047};
+  18          
+  19          static void GPIO_config(void) {
+  20   1        GPIO_InitTypeDef  GPIO_InitStructure;   //结构定义
+  21   1        GPIO_InitStructure.Pin  = GPIO_PIN;   //指定要初始化的IO,
+  22   1        GPIO_InitStructure.Mode = GPIO_OUT_PP;  //指定IO的输入或输出方式,GPIO_PullUp,GPIO_HighZ,GPIO_OUT_OD,GPIO_
+             -OUT_PP
+  23   1        GPIO_Inilize(GPIO_PORT, &GPIO_InitStructure);//初始化
+  24   1      }
+  25          void  PWM_config(u16 hz_val)
+  26          {
+  27   1        PWMx_InitDefine   PWMx_InitStructure;
+  28   1        
+  29   1        u16 period = (MAIN_Fosc / hz_val);  // 计算每个周期的计数值
+  30   1        
+  31   1        // 配置PWM5
+  32   1        PWMx_InitStructure.PWM_Mode       = CCMRn_PWM_MODE1;  //模式,   CCMRn_FREEZE,CCMRn_MATCH_VALID,CCMRn_MATCH_
+             -INVALID,CCMRn_ROLLOVER,CCMRn_FORCE_INVALID,CCMRn_FORCE_VALID,CCMRn_PWM_MODE1,CCMRn_PWM_MODE2
+  33   1        PWMx_InitStructure.PWM_Duty       = (u16)(period * 0.5);  //PWM占空比时间, 0~Period
+  34   1        PWMx_InitStructure.PWM_EnoSelect    = ENO8P;      //输出通道选择, ENO1P,ENO1N,ENO2P,ENO2N,ENO3P,ENO3N,ENO4P
+             -,ENO4N / ENO5P,ENO6P,ENO7P,ENO8P
+  35   1        PWM_Configuration(PWM8, &PWMx_InitStructure);     //初始化PWM,  PWMA,PWMB
+  36   1      
+  37   1        // 配置PWMB
+  38   1        PWMx_InitStructure.PWM_Period   = period - 1;     //周期时间,   0~65535
+  39   1        PWMx_InitStructure.PWM_DeadTime = 0;          //死区发生器设置, 0~255
+  40   1        PWMx_InitStructure.PWM_MainOutEnable= ENABLE;     //主输出使能, ENABLE,DISABLE
+  41   1        PWMx_InitStructure.PWM_CEN_Enable   = ENABLE;     //使能计数器, ENABLE,DISABLE
+  42   1        PWM_Configuration(PWMB, &PWMx_InitStructure);     //初始化PWM通用寄存器,  PWMA,PWMB
+  43   1      
+  44   1        // 切换PWM通道
+  45   1        PWM8_SW(PWM8_SW_P34);         
+  46   1      
+  47   1        // 初始化PWMB的中断
+  48   1        NVIC_PWM_Init(PWMB,DISABLE,Priority_0);
+  49   1      }
+  50          // 初始化蜂鸣器
+  51          void Buzzer_init(){
+C51 COMPILER V9.60.7.0   BUZZER                                                            08/29/2024 12:06:30 PAGE 2   
+
+  52   1        // 扩展寄存器使能
+  53   1        EAXSFR(); 
+  54   1        GPIO_config();
+  55   1        
+  56   1        // 把引脚拉低，否则默认高电平，三极管导通发热
+  57   1        BUZZER_PIN = 0;
+  58   1      }
+  59          
+  60          // 按照指定频率播放
+  61          void Buzzer_play(u16 hz_val){
+  62   1        PWM_config(hz_val);
+  63   1      }
+  64          
+  65          // 根据索引取出对应的音调
+  66          void Buzzer_beep(u16 idx){
+  67   1        u16 hz_value;
+  68   1        if(idx == 0){ // 不发音
+  69   2          Buzzer_stop();    
+  70   2          return;
+  71   2        }
+  72   1        
+  73   1        hz_value = FREQS[idx - 1];
+  74   1        Buzzer_play(hz_value);
+  75   1      }
+  76          
+  77          void Buzzer_alarm(){
+  78   1        Buzzer_beep(10);
+  79   1        os_wait2(K_TMO, 10);
+  80   1        Buzzer_stop();
+  81   1        os_wait2(K_TMO, 5);
+  82   1        
+  83   1        Buzzer_beep(9);
+  84   1        os_wait2(K_TMO, 10);
+  85   1        Buzzer_stop();
+  86   1        os_wait2(K_TMO, 5);
+  87   1        
+  88   1        Buzzer_beep(8);
+  89   1        os_wait2(K_TMO, 10);
+  90   1        Buzzer_stop();
+  91   1        os_wait2(K_TMO, 5);
+  92   1      }
+  93          
+  94          void Buzzer_alarm2(){
+  95   1        Buzzer_beep(8);
+  96   1        os_wait2(K_TMO, 20);
+  97   1        Buzzer_stop();
+  98   1        os_wait2(K_TMO, 10);
+  99   1        
+ 100   1        Buzzer_beep(9);
+ 101   1        os_wait2(K_TMO, 20);
+ 102   1        Buzzer_stop();
+ 103   1        os_wait2(K_TMO, 10);
+ 104   1        
+ 105   1        Buzzer_beep(10);
+ 106   1        os_wait2(K_TMO, 20);
+ 107   1        Buzzer_stop();
+ 108   1        os_wait2(K_TMO, 10);
+ 109   1      }
+ 110          
+ 111          void Buzzer_alarm3(){
+ 112   1        Buzzer_beep(14);
+ 113   1        os_wait2(K_TMO, 10);
+C51 COMPILER V9.60.7.0   BUZZER                                                            08/29/2024 12:06:30 PAGE 3   
+
+ 114   1        Buzzer_stop();
+ 115   1        os_wait2(K_TMO, 5);
+ 116   1        
+ 117   1        Buzzer_beep(14);
+ 118   1        os_wait2(K_TMO, 10);
+ 119   1        Buzzer_stop();
+ 120   1        os_wait2(K_TMO, 5);
+ 121   1        
+ 122   1        Buzzer_beep(14);
+ 123   1        os_wait2(K_TMO, 10);
+ 124   1        Buzzer_stop();
+ 125   1        os_wait2(K_TMO, 5);
+ 126   1      }
+ 127          
+ 128          
+ 129          // 停止播放
+ 130          void Buzzer_stop(){
+ 131   1        
+ 132   1        PWMx_InitDefine   PWMx_InitStructure;
+ 133   1        PWMx_InitStructure.PWM_EnoSelect  = 0;      //输出通道选择, ENO1P,ENO1N,ENO2P,ENO2N,ENO3P,ENO3N,ENO4P,ENO4N
+             - / ENO5P,ENO6P,ENO7P,ENO8P
+ 134   1        PWM_Configuration(PWM8, &PWMx_InitStructure);     //初始化PWM,  PWMA,PWMB
+ 135   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    443    ----
+   CONSTANT SIZE    =     56    ----
+   XDATA SIZE       =   ----      24
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

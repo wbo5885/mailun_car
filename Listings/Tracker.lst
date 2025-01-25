@@ -1,0 +1,88 @@
+C51 COMPILER V9.60.7.0   TRACKER                                                           08/29/2024 12:06:30 PAGE 1   
+
+
+C51 COMPILER V9.60.7.0, COMPILATION OF MODULE TRACKER
+OBJECT MODULE PLACED IN .\Objects\Tracker.obj
+COMPILER INVOKED BY: D:\Keil_v5\C51\BIN\C51.EXE Driver\Tracker.c LARGE OPTIMIZE(8,SPEED) BROWSE INCDIR(.\Lib;.\User;.\Dr
+                    -iver;.\App) DEBUG OBJECTEXTEND PRINT(.\Listings\Tracker.lst) TABS(2) OBJECT(.\Objects\Tracker.obj)
+
+line level    source
+
+   1          #include "Tracker.h"
+   2          #include "GPIO.h"
+   3          
+   4          void Tracker_init(){
+   5   1        TRACKER_GPIO_INIT();
+   6   1      }
+   7          
+   8          
+   9          // 扫描当前所有灯的状态，存到数组
+  10          // 灭的灯：1高电平，黑线（光敏电阻没收到光）
+  11          // 亮的灯：0低电平，地面（光敏电阻收到反射的光）
+  12          void Tracker_scan(u8 states[]){
+  13   1        states[0] = TRACK_0;
+  14   1        states[1] = TRACK_1;
+  15   1        states[2] = TRACK_2;
+  16   1        states[3] = TRACK_3;
+  17   1        states[4] = TRACK_4;
+  18   1      }
+  19          
+  20          // 读取线位置
+  21          // [-64, -32, 0, 32, 64]
+  22          // 返回值：0直走，>0右转，<0左转
+  23          int Tracker_get_position(){
+  24   1        static int last_pos = 0;
+  25   1        // 求灭灯的位置的数值均值
+  26   1        int sum = 0, cnt = 0, pos = 0;
+  27   1        if(TRACK_0){
+  28   2          sum += -64;
+  29   2          cnt++;
+  30   2        }
+  31   1        if(TRACK_1){
+  32   2          sum += -32;
+  33   2          cnt++;
+  34   2        }
+  35   1        if(TRACK_2){
+  36   2          sum += 0;
+  37   2          cnt++;
+  38   2        }
+  39   1        if(TRACK_3){
+  40   2          sum += 32;
+  41   2          cnt++;
+  42   2        }
+  43   1        if(TRACK_4){
+  44   2          sum += 64;
+  45   2          cnt++;
+  46   2        }
+  47   1        
+  48   1        // 没有灯亮，没有压到黑线
+  49   1        if(cnt == 0){
+  50   2          // 状态丢失，以上一次状态位置
+  51   2          return last_pos;
+  52   2      //    return 0;
+  53   2        }
+  54   1        
+C51 COMPILER V9.60.7.0   TRACKER                                                           08/29/2024 12:06:30 PAGE 2   
+
+  55   1        // 求均值 avg = sum / cnt;
+  56   1        pos = sum / cnt;
+  57   1        
+  58   1        // 记录当前值，作为上一次状态
+  59   1        // 用于下一次没有压线时的状态 
+  60   1        last_pos = pos;
+  61   1        return pos;
+  62   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    167    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =      2       2
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

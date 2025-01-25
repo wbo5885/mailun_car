@@ -1,0 +1,218 @@
+C51 COMPILER V9.60.7.0   APP_BLUETOOTH                                                     08/29/2024 12:06:30 PAGE 1   
+
+
+C51 COMPILER V9.60.7.0, COMPILATION OF MODULE APP_BLUETOOTH
+OBJECT MODULE PLACED IN .\Objects\App_Bluetooth.obj
+COMPILER INVOKED BY: D:\Keil_v5\C51\BIN\C51.EXE App\App_Bluetooth.c LARGE OPTIMIZE(8,SPEED) BROWSE INCDIR(.\Lib;.\User;.
+                    -\Driver;.\App) DEBUG OBJECTEXTEND PRINT(.\Listings\App_Bluetooth.lst) TABS(2) OBJECT(.\Objects\App_Bluetooth.obj)
+
+line level    source
+
+   1          #include "App.h"
+   2          #include "GPIO.h"
+   3          #include "UART.h"
+   4          #include <STRING.H>
+   5          
+   6          #include "Motors.h"
+   7          #include "Light.h"
+   8          #include "Buzzer.h"
+   9          
+  10          /************************************
+  11           帧头  X  Y  A  B  C  D
+  12          DD 77 00 2F 01 00 00 00
+  13          DD 77 00 00 00 00 00 00
+  14          
+  15          DD 77 00 00 01 00 00 00  A按下 亮灯，蜂鸣器, 超声测距
+  16          DD 77 00 00 00 01 00 00  B按下 左旋（左掉头）
+  17          DD 77 00 00 00 00 01 00  C按下 右旋（右掉头）
+  18          DD 77 00 00 00 00 00 01  D按下 启停巡线
+  19          
+  20          超声测距：如果前方障碍物距离小于15cm，停车(蜂鸣器)
+  21          **************************************/
+  22          #define BTN_A  4
+  23          #define BTN_B  5
+  24          #define BTN_C  6
+  25          #define BTN_D  7
+  26          u8 light_state = 0; // 0关闭，1开启
+  27          u8 is_turning  = 0; // 0停止，1转
+  28          
+  29          
+  30          void do_control(u8 buffer[], u8 len) {
+  31   1        char x, y;
+  32   1      
+  33   1      //  if(RX2_Buffer[0] != 0xDD || RX2_Buffer[1] != 0x77) {
+  34   1      //    return;
+  35   1      //  }
+  36   1      
+  37   1        // -------------------------------------------------------按钮A
+  38   1        if(buffer[BTN_A]) {
+  39   2          light_state = !light_state;
+  40   2          // 灯光开关
+  41   2          light_state ? Light_on(LIGHT_ALL): Light_off(LIGHT_ALL);
+  42   2          // 蜂鸣器
+  43   2          light_state ? Buzzer_alarm(): Buzzer_alarm2();
+  44   2          // 根据light_state状态, 启停超声测距功能
+  45   2          is_ultrasonic_enable = light_state;
+  46   2      
+  47   2          return;
+  48   2        }
+  49   1      
+  50   1        // -------------------------------------------------------按钮BC
+  51   1        if (buffer[BTN_B]) { // 左旋
+  52   2          Motors_around(30, 0);
+  53   2          is_turning = TRUE;
+  54   2          return;
+C51 COMPILER V9.60.7.0   APP_BLUETOOTH                                                     08/29/2024 12:06:30 PAGE 2   
+
+  55   2        } else if (RX2_Buffer[BTN_C]) { // 右旋
+  56   2          Motors_around(30, 1);
+  57   2          is_turning = TRUE;
+  58   2          return;
+  59   2        } else {
+  60   2          if(is_turning) {
+  61   3            // 之前在旋转状态， 停止旋转
+  62   3            Motors_stop();
+  63   3            is_turning = FALSE;
+  64   3            return;
+  65   3          }
+  66   2        }
+  67   1      
+  68   1        // -------------------------------------------------------按钮D, 启停巡线
+  69   1        if(buffer[BTN_D]) { // 启停巡线
+  70   2          is_tracking = !is_tracking;
+  71   2          if(is_tracking) {
+  72   3            os_create_task(TASK_TRACK); // 开始巡线
+  73   3            printf("Start tracking!\n");
+  74   3          } else {
+  75   3            os_delete_task(TASK_TRACK); // 停止巡线
+  76   3            Motors_stop(); // 停车
+  77   3            printf("Stop tracking!\n");
+  78   3          }
+  79   2          return;
+  80   2        }
+  81   1      
+  82   1        if(isLowPower()) { // 电量低
+  83   2          printf("Can't Move.\n");
+  84   2          // 不允许Move
+  85   2          Motors_stop(); // 停车
+  86   2          return;
+  87   2        }
+  88   1      
+  89   1      // 如果开启了巡线任务，则不执行以下代码
+  90   1        if(is_tracking) {
+  91   2          return;
+  92   2        }
+  93   1      
+  94   1        // 打印x,y
+  95   1        x = buffer[2];
+  96   1        y = buffer[3];
+  97   1      
+  98   1        printf("%d, %d\n", (int)x, (int)y);
+  99   1      
+ 100   1        Motors_move(x, y);
+ 101   1      }
+*** WARNING C280 IN LINE 30 OF App\App_Bluetooth.c: 'len': unreferenced local variable
+ 102          
+ 103          /******
+ 104          进行控制之前的解析操作
+ 105          0xF3A0
+ 106          
+ 107          DD 77 00 2F 00 00 00 00 一帧数据
+ 108          
+ 109          DD 77 00 2F 00 00 00 00 DD 77 00 00 00 00 00 00 前进指令+停止指令
+ 110          
+ 111          DD 77 EF 50 01 00 01 00 DD 77 00 00 01 00 01 00             ==>16 前进指令+停止指令
+ 112          DD 77 EF 50 01 DC DD 77 13 77 00 00 01 00 01 00             ==>16 前进指令+停止指令
+ 113          DD 77 EF 50 01 00 01 00 DD 77 00 00                         ==> 8 + 4 = 12
+ 114          DD 77 EF 50 01 00 01 00 DD 77 00 00 01 00 01 00 DD 77 3A 4B ==> 16 + 4 = 20
+ 115          
+C51 COMPILER V9.60.7.0   APP_BLUETOOTH                                                     08/29/2024 12:06:30 PAGE 3   
+
+ 116          *******/
+ 117          #define NEW_BLE_NAME "KT6368A-BLE-POP"
+ 118          char buffer[30];
+ 119          void do_control_parse(){
+ 120   1        u8 i;
+ 121   1        
+ 122   1      //  printf("addr: %p\n", RX2_Buffer);
+ 123   1      //  printf("addr: %p\n", &RX2_Buffer[0]);
+ 124   1      //  printf("addr: %p\n", RX2_Buffer + 0);
+ 125   1        
+ 126   1      //  printf("dat-> ");
+ 127   1      //  for(i=0; i<COM2.RX_Cnt; i++)  {
+ 128   1      //    // RX2_Buffer[i]存的是接收的每个字节，写出用 TX2_write2buff
+ 129   1      //    printf("%02X ", (int)RX2_Buffer[i]);
+ 130   1      //  }
+ 131   1      //  printf("\n");
+ 132   1        
+ 133   1        // -------------------------------- 先判断AT指令 TM+KT6368A-BLE-2.1\r\n
+ 134   1        // 判断 RX2_Buffer 是否是TM+开头
+ 135   1        if(strncmp(RX2_Buffer, "TM+", 3) == 0) {
+ 136   2          // 是BLE名称查询的AT指令, 再判断是否是TM+KT6368A-BLE-2.1\r\n
+ 137   2          if (strncmp(RX2_Buffer + 3, "KT6368A-BLE-2.1\r\n", 17) == 0) {
+ 138   3            printf("Default BLE name, Need Update!");
+ 139   3      
+ 140   3            // AT指令的发送
+ 141   3            sprintf(buffer, "AT+BM%s\r\n", NEW_BLE_NAME);
+ 142   3            PrintString2(buffer);
+ 143   3      
+ 144   3            os_wait2(K_TMO, 100); // 100 * 5 = 500ms
+ 145   3            PrintString2("AT+CZ\r\n");
+ 146   3          }
+ 147   2          return;
+ 148   2        }
+ 149   1      
+ 150   1        
+ 151   1        // -------------------------------- 再判断蓝牙遥控器数据
+ 152   1        // 进行长度判定
+ 153   1        if(COM2.RX_Cnt < 8) return;
+ 154   1        // 循环拆包
+ 155   1        for(i = 0; i <= COM2.RX_Cnt - 8; i++){
+ 156   2          // 判断当前位置是否是DD,77
+ 157   2          if(RX2_Buffer[i] == 0xDD && RX2_Buffer[i + 1] == 0x77){
+ 158   3            do_control(&RX2_Buffer[i], 8);
+ 159   3            i += 7;
+ 160   3          }
+ 161   2        }
+ 162   1        
+ 163   1        
+ 164   1      }
+ 165          
+ 166          void task_bluetooth() _task_ TASK_BLUETOOTH{
+ 167   1       u8 i;
+ 168   1        // 串口2接收蓝牙, 通过串口1发给PC
+ 169   1        while(1) {
+ 170   2          if(COM2.RX_TimeOut > 0 && --COM2.RX_TimeOut == 0) {
+ 171   3            //超时计数
+ 172   3            if(COM2.RX_Cnt > 0) {
+ 173   4      //        do_control();
+ 174   4              do_control_parse(); // Hello123
+ 175   4      //        printf("UART2: %d\n", (int)COM2.RX_Cnt);
+ 176   4              // 这里处理收到的数据，做具体的逻辑，可以调用自己的on_uart2_recv
+ 177   4             for(i=0; i<COM2.RX_Cnt; i++) {
+C51 COMPILER V9.60.7.0   APP_BLUETOOTH                                                     08/29/2024 12:06:30 PAGE 4   
+
+ 178   5               // RX2_Buffer[i]存的是接收的每个字节，写出用 TX2_write2buff
+ 179   5               TX1_write2buff(RX2_Buffer[i]);
+ 180   5             }
+ 181   4            }
+ 182   3            COM2.RX_Cnt = 0;
+ 183   3          }
+ 184   2      
+ 185   2          os_wait2(K_TMO, 2); // 10ms * 5 = 50ms
+ 186   2        }
+ 187   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    624    ----
+   CONSTANT SIZE    =    141    ----
+   XDATA SIZE       =     32       8
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  1 WARNING(S),  0 ERROR(S)
