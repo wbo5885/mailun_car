@@ -3,6 +3,16 @@
 #include "ADC.h"
 #include "NVIC.h"
 
+// 电池电压阈值定义（单位：伏特）
+#define BATTERY_FULL_THRESHOLD      4.0f
+#define BATTERY_MEDIUM_THRESHOLD    3.7f
+#define BATTERY_LOW_THRESHOLD       3.5f
+#define BATTERY_CRITICAL_THRESHOLD  3.3f
+
+// 电池满电电压和最低电压
+#define BATTERY_MAX_VOLTAGE         4.2f
+#define BATTERY_MIN_VOLTAGE         3.2f
+
 static void GPIO_config(void) {
     GPIO_InitTypeDef	GPIO_InitStructure;		//结构定义
     GPIO_InitStructure.Pin  = GPIO_Pin_3;		//指定要初始化的IO,
@@ -37,4 +47,40 @@ float Battery_get_voltage(){
 	// Vcc / (51kΩ + 10kΩ) = Vadc / 10kΩ
 	return (Vadc * 6.1) * 1.005; 
 	
+}
+
+BatteryStatus_t Battery_get_status(void) {
+    float voltage = Battery_get_voltage();
+    
+    if (voltage >= BATTERY_FULL_THRESHOLD) {
+        return BATTERY_FULL;
+    } else if (voltage >= BATTERY_MEDIUM_THRESHOLD) {
+        return BATTERY_MEDIUM;
+    } else if (voltage >= BATTERY_LOW_THRESHOLD) {
+        return BATTERY_LOW;
+    } else {
+        return BATTERY_CRITICAL;
+    }
+}
+
+uint8_t Battery_get_percentage(void) {
+    float voltage = Battery_get_voltage();
+    float percentage;
+    
+    // 计算电量百分比
+    percentage = (voltage - BATTERY_MIN_VOLTAGE) / 
+                (BATTERY_MAX_VOLTAGE - BATTERY_MIN_VOLTAGE) * 100.0f;
+    
+    // 限制百分比范围在0-100之间
+    if (percentage > 100.0f) {
+        percentage = 100.0f;
+    } else if (percentage < 0.0f) {
+        percentage = 0.0f;
+    }
+    
+    return (uint8_t)percentage;
+}
+
+bool Battery_is_low(void) {
+    return Battery_get_voltage() <= BATTERY_LOW_THRESHOLD;
 }
